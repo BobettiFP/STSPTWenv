@@ -12,7 +12,7 @@ cd POMO+PIP
 
 Entry point: **`train.py`**
 
-**Problems:** `--problem` one of `TSPTW`, `TSPDL`, `STSPTW`.
+**Problems:** `--problem` one of `TSPTW`, `STSPTW`.
 
 **Model types:** `--model_type` one of `POMO`, `POMO_STAR`, `POMO_STAR_PIP` (POMO only / + Lagrangian / + PIP masking).
 
@@ -74,7 +74,7 @@ python test.py --problem STSPTW --problem_size 10 --hardness hard \
 ## Summary
 
 - **Working directory:** `POMO+PIP/`
-- **Train:** `python train.py --problem <TSPTW|STSPDL|STSPTW> --problem_size N --pomo_size N --hardness <easy|medium|hard> --model_type <POMO|POMO_STAR|POMO_STAR_PIP> [--reveal_delay_before_action] [other args]`
+- **Train:** `python train.py --problem <TSPTW|STSPTW> --problem_size N --pomo_size N --hardness <easy|medium|hard> --model_type <POMO|POMO_STAR|POMO_STAR_PIP> [--reveal_delay_before_action] [other args]`
 - **Test:** `python test.py --problem ... --checkpoint <path> [--reveal_delay_before_action] [other args]`
 
 Shell scripts (e.g. `run_train_n10.sh`) are not tracked; use the commands above as the reference.
