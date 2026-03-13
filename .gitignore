@@ -1,0 +1,34 @@
+.pt
+
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.out
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+
+# Python build
+build/
+dist/
+*.egg-info/
+
+# Project-specific
+POMO+PIP/__pycache__/
+POMO+PIP/envs/__pycache__/
+POMO+PIP/models/__pycache__/
+POMO+PIP/results/
+POMO+PIP/data/
+POMO+PIP/*.log
+
+# Large external data
+data/
+
+# Checkpoints
+**/trained_model_*.pt
+**/epoch-*.pt
