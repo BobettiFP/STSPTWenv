@@ -65,6 +65,14 @@ if __name__ == "__main__":
     parser.add_argument('--pomo_start', type=bool, default=False)
     parser.add_argument('--val_dataset', type=str, nargs='+', default=None, help="use the default one if set to None")
     parser.add_argument('--delay_scale', type=float, default=0.1, help='STSPTW delay weight (relative to deterministic travel)')
+    parser.add_argument(
+        '--model_type',
+        type=str,
+        default="POMO_STAR",
+        choices=["POMO", "POMO_STAR", "POMO_STAR_PIP"],
+        help="Backbone + PIP variant: POMO (no LM, no PI mask), "
+             "POMO_STAR (LM only), POMO_STAR_PIP (LM + real PI mask; no PIP-D)."
+    )
 
     # model_params
     parser.add_argument('--embedding_dim', type=int, default=128)
@@ -147,6 +155,45 @@ if __name__ == "__main__":
     parser.add_argument('--wandb_logger', type=bool, default=False)
 
     args = parser.parse_args()
+
+    # Map high-level model_type to concrete training options.
+    # POMO:       no LM, no PI masking, no PIP-D
+    # POMO_STAR:  LM only (timeout_reward etc.), no PI masking, no PIP-D
+    # POMO_STAR_PIP: LM + real PI masking (generate_PI_mask), no PIP-D
+    if args.model_type == "POMO":
+        # No Lagrangian-based timeout reward
+        args.timeout_reward = False
+        args.timeout_node_reward = False
+        args.fsb_reward_only = False
+        args.penalty_increase = False
+        # No PI masking / PIP-D
+        args.generate_PI_mask = False
+        args.use_real_PI_mask = False
+        args.use_predicted_PI_mask = False
+        args.pip_decoder = False
+        args.lazy_pip_model = False
+    elif args.model_type == "POMO_STAR":
+        # Lagrangian-based timeout reward on, but no PI masking
+        args.timeout_reward = True
+        args.timeout_node_reward = True
+        args.penalty_increase = False
+        # Keep penalty_factor as provided
+        args.generate_PI_mask = False
+        args.use_real_PI_mask = False
+        args.use_predicted_PI_mask = False
+        args.pip_decoder = False
+        args.lazy_pip_model = False
+    elif args.model_type == "POMO_STAR_PIP":
+        # LM on + real PI masking (PIP), no PIP-D
+        args.timeout_reward = True
+        args.timeout_node_reward = True
+        args.penalty_increase = False
+        args.generate_PI_mask = True
+        args.use_real_PI_mask = True
+        args.use_predicted_PI_mask = False
+        args.pip_decoder = False
+        args.lazy_pip_model = False
+
     seed_everything(args.seed)
 
     if args.val_dataset is None:

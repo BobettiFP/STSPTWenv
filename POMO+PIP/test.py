@@ -8,8 +8,15 @@ from utils import *
 
 
 def args2dict(args):
-    env_params = {"problem_size": args.problem_size, "pomo_size": args.pomo_size, "hardness": args.hardness,
-                  "pomo_start":args.pomo_start, "k_sparse": args.k_sparse}
+    env_params = {
+        "problem_size": args.problem_size,
+        "pomo_size": args.pomo_size,
+        "hardness": args.hardness,
+        "pomo_start": args.pomo_start,
+        "k_sparse": args.k_sparse,
+        "delay_scale": getattr(args, "delay_scale", 0.1),
+        "time_scale": getattr(args, "time_scale", 10.0),
+    }
 
     model_params = {
                     # original parameters in MvMOE for POMO
@@ -44,6 +51,8 @@ if __name__ == "__main__":
     parser.add_argument('--problem_size', type=int, default=50)
     parser.add_argument('--pomo_size', type=int, default=1, help="the number of start node, should <= problem size")
     parser.add_argument('--pomo_start', type=bool, default=False)
+    parser.add_argument('--delay_scale', type=float, default=0.1, help="STSPTW delay weight (relative to deterministic travel)")
+    parser.add_argument('--time_scale', type=float, default=10.0, help="STSPTW pseudo time horizon for delay dynamics")
     # model_params
     parser.add_argument('--embedding_dim', type=int, default=128)
     parser.add_argument('--sqrt_embedding_dim', type=float, default=128 ** (1 / 2))
@@ -92,9 +101,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     if args.test_set_path is None:
-        args.test_set_path = f"../data/{args.problem}/{args.problem.lower()}{args.problem_size}_{args.hardness}.pkl"
+        data_problem = "TSPTW" if args.problem == "STSPTW" else args.problem
+        args.test_set_path = f"../data/{data_problem}/{data_problem.lower()}{args.problem_size}_{args.hardness}.pkl"
     if args.test_set_opt_sol_path is None:
-        args.test_set_opt_sol_path = f"../data/{args.problem}/lkh_{args.problem.lower()}{args.problem_size}_{args.hardness}.pkl"
+        data_problem = "TSPTW" if args.problem == "STSPTW" else args.problem
+        args.test_set_opt_sol_path = f"../data/{data_problem}/lkh_{data_problem.lower()}{args.problem_size}_{args.hardness}.pkl"
     pp.pprint(vars(args))
     env_params, model_params, tester_params = args2dict(args)
     seed_everything(args.seed)
