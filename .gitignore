@@ -1,5 +1,8 @@
 .pt
 
+# Shell scripts (run instructions in README)
+*.sh
+
 venv/
 __pycache__/
 *.pyc

@@ -12,7 +12,10 @@ from utils import *
 def args2dict(args):
     env_params = {"problem_size": args.problem_size, "pomo_size": args.pomo_size, "hardness": args.hardness,
                   "pomo_start": args.pomo_start, "val_dataset": args.val_dataset, "val_episodes": args.val_episodes,
-                  "k_sparse": args.k_sparse, "delay_scale": getattr(args, "delay_scale", 0.1)}
+                  "k_sparse": args.k_sparse,
+                  "delay_scale": getattr(args, "delay_scale", 0.1),
+                  "reveal_delay_before_action": getattr(args, "reveal_delay_before_action", False),
+                  }
 
     model_params = {
                     # original parameters in MvMOE for POMO
@@ -65,6 +68,11 @@ if __name__ == "__main__":
     parser.add_argument('--pomo_start', type=bool, default=False)
     parser.add_argument('--val_dataset', type=str, nargs='+', default=None, help="use the default one if set to None")
     parser.add_argument('--delay_scale', type=float, default=0.1, help='STSPTW delay weight (relative to deterministic travel)')
+    parser.add_argument(
+        '--reveal_delay_before_action',
+        action='store_true',
+        help='For STSPTW: if set, sample and reveal stochastic travel times before action selection (pre-decision noise).'
+    )
     parser.add_argument(
         '--model_type',
         type=str,
@@ -212,7 +220,8 @@ if __name__ == "__main__":
         run_name += f"_PIMask_{args.pip_step}Step"
     if args.pip_decoder:
         run_name += f"_PIPDecoder_UpdateFrequency_{args.simulation_stop_epoch}_{args.pip_update_interval}_{args.pip_update_epoch}_{args.pip_last_growup}"
-    process_start_time = datetime.now(pytz.timezone("Asia/Singapore"))
+    # Use Toronto time for run naming / logging
+    process_start_time = datetime.now(pytz.timezone("America/Toronto"))
     if args.resume_path is not None:
         args.log_path = args.resume_path
     else:

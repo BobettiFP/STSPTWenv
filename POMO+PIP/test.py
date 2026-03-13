@@ -16,6 +16,7 @@ def args2dict(args):
         "k_sparse": args.k_sparse,
         "delay_scale": getattr(args, "delay_scale", 0.1),
         "time_scale": getattr(args, "time_scale", 10.0),
+        "reveal_delay_before_action": getattr(args, "reveal_delay_before_action", False),
     }
 
     model_params = {
@@ -53,6 +54,11 @@ if __name__ == "__main__":
     parser.add_argument('--pomo_start', type=bool, default=False)
     parser.add_argument('--delay_scale', type=float, default=0.1, help="STSPTW delay weight (relative to deterministic travel)")
     parser.add_argument('--time_scale', type=float, default=10.0, help="STSPTW pseudo time horizon for delay dynamics")
+    parser.add_argument(
+        '--reveal_delay_before_action',
+        action='store_true',
+        help='For STSPTW: if set, sample and reveal stochastic travel times before action selection (pre-decision noise).'
+    )
     # model_params
     parser.add_argument('--embedding_dim', type=int, default=128)
     parser.add_argument('--sqrt_embedding_dim', type=float, default=128 ** (1 / 2))

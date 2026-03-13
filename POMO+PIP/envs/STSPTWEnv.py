@@ -12,7 +12,7 @@ dg = sys.modules[__name__]
 STSPTW_SET = namedtuple("STSPTW_SET",
                        ["node_loc",
                         "node_tw",
-                        "durations",
+                        "durations", #set as 0
                         "service_window",
                         "time_factor", "loc_factor"])
 
@@ -39,6 +39,9 @@ class Step_State:
     current_time: torch.Tensor = None
     length: torch.Tensor = None
     current_coord: torch.Tensor = None
+    # Optional: pre-sampled travel times from current node to all nodes,
+    # shape (batch, pomo, problem). Used when reveal_delay_before_action=True.
+    next_travel_time: torch.Tensor = None
 
 
 class STSPTWEnv:
@@ -68,6 +71,12 @@ class STSPTWEnv:
         # These can be tuned; keep them modest for n=10.
         self.delay_scale = env_params.get('delay_scale', 0.1)  # relative magnitude vs deterministic travel
         self.time_scale = env_params.get('time_scale', 10.0)   # map normalized time -> pseudo clock [0, time_scale]
+
+        # Whether to reveal edge-specific stochastic travel times to the agent
+        # before action selection (pre-decision noise) or only realize them
+        # after an action is chosen (post-decision noise, default).
+        self.reveal_delay_before_action = env_params.get('reveal_delay_before_action', False)
+        self.pre_sampled_pairwise_travel = None
 
         # Const @Load_Problem
         self.batch_size = None
@@ -279,6 +288,10 @@ class STSPTWEnv:
         self.length = torch.zeros(size=(self.batch_size, self.pomo_size)).to(self.device)
         self.current_coord = self.node_xy[:, :1, :]
 
+        # clear any pre-sampled travel times
+        self.pre_sampled_pairwise_travel = None
+        self.step_state.next_travel_time = None
+
         reward = None
         done = False
         return self.reset_state, reward, done
@@ -293,6 +306,21 @@ class STSPTWEnv:
         self.step_state.length = self.length
         self.step_state.current_coord = self.current_coord
 
+        # Optionally sample and reveal stochastic travel times before action selection.
+        if self.reveal_delay_before_action:
+            # current_coord may have shape (batch, 1, 2) right after reset; expand if needed
+            current_coord = self.current_coord
+            if current_coord.size(1) == 1 and self.pomo_size > 1:
+                current_coord = current_coord.expand(-1, self.pomo_size, -1)
+
+            pairwise_dist = (current_coord[:, :, None, :] - self.node_xy[:, None, :, :].expand(-1, self.pomo_size, -1, -1)).norm(p=2, dim=-1)
+            pairwise_delay = self._sample_delay(pairwise_dist, self.current_time[:, :, None].expand_as(pairwise_dist))
+            self.pre_sampled_pairwise_travel = (pairwise_dist + pairwise_delay) / self.speed
+            self.step_state.next_travel_time = self.pre_sampled_pairwise_travel
+        else:
+            self.pre_sampled_pairwise_travel = None
+            self.step_state.next_travel_time = None
+
         reward = None
         done = False
         return self.step_state, reward, done
@@ -305,13 +333,24 @@ class STSPTWEnv:
         self.selected_node_list = torch.cat((self.selected_node_list, self.current_node[:, :, None]), dim=2)
 
         current_coord = self.node_xy[torch.arange(self.batch_size)[:, None], selected]
+
+        # Base geometric distance for logging / deterministic length
         new_length = (current_coord - self.current_coord).norm(p=2, dim=-1)
 
-        # stochastic delay: sampled per step, per (batch, pomo)
-        current_time_norm = self.current_time
-        delay = self._sample_delay(new_length, current_time_norm)
-
-        effective_travel_time = (new_length + delay) / self.speed
+        # Decide how to realize stochastic travel time for the chosen edge.
+        if self.reveal_delay_before_action and self.pre_sampled_pairwise_travel is not None:
+            # Use the pre-sampled travel times from pre_step for the selected edges.
+            # pre_sampled_pairwise_travel shape: (batch, pomo, problem)
+            flat_travel = self.pre_sampled_pairwise_travel.view(self.batch_size * self.pomo_size, self.problem_size)
+            flat_selected = selected.view(-1)
+            flat_indices = torch.arange(self.batch_size * self.pomo_size, device=self.device)
+            step_travel = flat_travel[flat_indices, flat_selected].view(self.batch_size, self.pomo_size)
+            effective_travel_time = step_travel
+        else:
+            # Default: sample delay only after the action is chosen (post-decision noise).
+            current_time_norm = self.current_time
+            delay = self._sample_delay(new_length, current_time_norm)
+            effective_travel_time = (new_length + delay) / self.speed
 
         self.length = self.length + new_length
         self.current_coord = current_coord
