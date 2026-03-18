@@ -47,7 +47,7 @@ def args2dict(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Proactive Infeasibility Prevention (PIP) Framework for Routing Problems with Complex Constraints.")
     # env_params
-    parser.add_argument('--problem', type=str, default="TSPTW", choices=["TSPTW", "STSPTW"])
+    parser.add_argument('--problem', type=str, default="TSPTW", choices=["TSPTW", "STSPTW", "STSPTW_v2"])
     parser.add_argument('--hardness', type=str, default="hard", choices=["hard", "medium", "easy"], help="Different levels of constraint hardness")
     parser.add_argument('--problem_size', type=int, default=50)
     parser.add_argument('--pomo_size', type=int, default=1, help="the number of start node, should <= problem size")
@@ -97,6 +97,7 @@ if __name__ == "__main__":
     parser.add_argument('--aug_batch_size', type=int, default=2500)
     parser.add_argument('--test_set_path', type=str, default=None, help="evaluate on default test dataset if None")
     parser.add_argument('--test_set_opt_sol_path', type=str, default=None, help="evaluate on default test dataset if None")
+    parser.add_argument('--no_opt_sol', action='store_true', help="do not load optimal solutions (skip gap computation)")
     parser.add_argument('--fsb_dist_only', type=bool, default=True)
     parser.add_argument('--output_best_tour_path', type=str, default=None)
     # settings (e.g., GPU)
@@ -107,10 +108,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     if args.test_set_path is None:
-        data_problem = "TSPTW" if args.problem == "STSPTW" else args.problem
+        data_problem = "TSPTW" if args.problem in ("STSPTW", "STSPTW_v2") else args.problem
         args.test_set_path = f"../data/{data_problem}/{data_problem.lower()}{args.problem_size}_{args.hardness}.pkl"
-    if args.test_set_opt_sol_path is None:
-        data_problem = "TSPTW" if args.problem == "STSPTW" else args.problem
+    if args.test_set_opt_sol_path is None and not getattr(args, 'no_opt_sol', False):
+        data_problem = "TSPTW" if args.problem in ("STSPTW", "STSPTW_v2") else args.problem
         args.test_set_opt_sol_path = f"../data/{data_problem}/lkh_{data_problem.lower()}{args.problem_size}_{args.hardness}.pkl"
     pp.pprint(vars(args))
     env_params, model_params, tester_params = args2dict(args)

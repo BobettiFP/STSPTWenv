@@ -71,6 +71,41 @@ python test.py --problem STSPTW --problem_size 10 --hardness hard \
 
 ---
 
+## Experiments: TSPTW models on STSPTW (delay sweep)
+
+**Script:** `run_test_tsptw_on_stsptw_sweep_dw.py` (run from `STSPTWenv/`)
+
+Tests the **9 TSPTW-trained models** on **STSPTW** with `delay_scale` from **0.01 to 1.0** (step 0.01). Total **900** runs. Results are written to `test_tsptw_on_stsptw_dw_sweep.csv`.
+
+```bash
+cd STSPTWenv
+# Full run (9 × 100 = 900 experiments)
+python run_test_tsptw_on_stsptw_sweep_dw.py
+
+# Dry run: list checkpoints and example command
+python run_test_tsptw_on_stsptw_sweep_dw.py --dry_run
+
+# Test with fewer runs
+python run_test_tsptw_on_stsptw_sweep_dw.py --limit_models 2 --limit_dw 5
+```
+
+Uses `--no_opt_sol` so optimal solution files are not required (gap column will be 0).
+
+**Experiment 2: STSPTW models on matching STSPTW env (90 runs)**
+
+**Script:** `run_test_stsptw_matched.py`
+
+Each of the **90 STSPTW-trained models** is tested on the **same** STSPTW setting it was trained on (same hardness, same delay_weight). Total **90** runs. Results: `test_stsptw_matched.csv`.
+
+```bash
+cd STSPTWenv
+python run_test_stsptw_matched.py --dry_run   # list checkpoints
+python run_test_stsptw_matched.py --limit 5  # test first 5 configs
+python run_test_stsptw_matched.py             # full 90 runs
+```
+
+---
+
 ## Summary
 
 - **Working directory:** `POMO+PIP/`
