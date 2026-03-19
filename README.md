@@ -141,6 +141,135 @@ If `--test_set_path` is omitted, the default dataset under `../data/TSPTW/tsptw<
 
 ---
 
+## Using the Python API directly
+
+All commands above go through `train.py` / `test.py`. If you want to use the environments or model in a script or notebook, there are several non-obvious requirements.
+
+### Environment API
+
+**Required constructor parameter: `k_sparse`**
+
+All three environments (`TSPTWEnv`, `STSPTWEnv`, `STSPTWEnv_v2`) accept `**env_params` and require `k_sparse` to be present. Set it to `problem_size + 1` to disable sparsification (use all neighbors):
+
+```python
+env_params = dict(
+    problem_size=10,
+    pomo_size=10,
+    hardness='hard',
+    k_sparse=11,          # required — set > problem_size to disable sparsification
+    device=torch.device('cpu'),
+)
+```
+
+**Correct call sequence: `load_problems` → `reset` → `pre_step` → loop `step`**
+
+```python
+env = TSPTWEnv(**env_params)
+problems = env.get_random_problems(batch_size, problem_size)
+env.load_problems(batch_size, problems=problems)
+reset_state, _, _ = env.reset()   # returns (reset_state, None, False)
+env.pre_step()
+
+done = False
+while not done:
+    # ... compute `selected` (shape: batch × pomo) ...
+    step_state, reward, done, infeasible = env.step(selected)
+    # reward is None until done=True
+```
+
+**`env.step()` returns 4 values, not 3**
+
+```python
+step_state, reward, done, infeasible = env.step(selected)
+# reward: (batch, pomo) tensor — only non-None when done=True
+# infeasible: (batch, pomo) bool tensor — True for any pomo that violated a TW
+```
+
+### Model API
+
+**`SINGLEModel` required parameters**
+
+Beyond the standard architecture params, the model requires several flags that `train.py` sets from CLI args:
+
+```python
+model_params = dict(
+    problem='TSPTW',          # or 'STSPTW', 'STSPTW_v2'
+    embedding_dim=128,
+    sqrt_embedding_dim=128**0.5,
+    encoder_layer_num=6,
+    qkv_dim=16,
+    head_num=8,
+    logit_clipping=10,
+    ff_hidden_dim=512,
+    eval_type='softmax',
+    model_type='POMO_STAR_PIP',
+    norm='instance',
+    norm_loc='norm_last',     # required — 'norm_first' or 'norm_last'
+    tw_normalize=True,        # required — normalize TW values by max TW end
+    pip_decoder=False,        # required — True only for auxiliary PIP decoder variant
+    W_q_sl=True,              # required — weight flags for selective attention
+    W_kv_sl=True,
+    W_out_sl=True,
+    device=torch.device('cpu'),
+)
+```
+
+**`model.forward()` requires `tw_end` for TSPTW problems**
+
+The decoder uses `tw_end` to normalize the current-time context feature. Pass `env.node_tw_end`:
+
+```python
+model.pre_forward(reset_state)
+env.pre_step()
+
+done = False
+while not done:
+    selected, prob = model(env.step_state, tw_end=env.node_tw_end)
+    step_state, reward, done, infeasible = env.step(selected)
+```
+
+### Minimal working example
+
+```python
+import torch
+from envs.TSPTWEnv import TSPTWEnv
+from models.SINGLEModel import SINGLEModel
+
+batch_size, n = 4, 10
+device = torch.device('cpu')
+
+env_params = dict(problem_size=n, pomo_size=n, hardness='hard', k_sparse=n+1, device=device)
+model_params = dict(
+    problem='TSPTW', embedding_dim=128, sqrt_embedding_dim=128**0.5,
+    encoder_layer_num=6, qkv_dim=16, head_num=8, logit_clipping=10,
+    ff_hidden_dim=512, eval_type='softmax', model_type='POMO_STAR_PIP',
+    norm='instance', norm_loc='norm_last', tw_normalize=True,
+    pip_decoder=False, W_q_sl=True, W_kv_sl=True, W_out_sl=True, device=device,
+)
+
+env = TSPTWEnv(**env_params)
+env.load_problems(batch_size, problems=env.get_random_problems(batch_size, n))
+reset_state, _, _ = env.reset()
+
+model = SINGLEModel(**model_params)
+model.pre_forward(reset_state)
+env.pre_step()
+
+done = False
+while not done:
+    selected, prob = model(env.step_state, tw_end=env.node_tw_end)
+    step_state, reward, done, infeasible = env.step(selected)
+
+print(reward.shape)      # (batch, pomo)
+print(infeasible.shape)  # (batch, pomo)
+```
+
+### Note on high infeasibility with random / untrained models
+
+With random actions or an untrained model on `hardness='hard'` instances, `infeasible` will be `True` for nearly all POMO rollouts. This is expected — hard instances have tight TW constraints that are almost impossible to satisfy without a trained policy.
+
+---
+
 ## Sweep experiments
 
 All sweep scripts live in `scripts/` and are run from the **project root** (`STSPTWenv/`).
