@@ -1,9 +1,8 @@
 #!/bin/bash
-# TSPTW n=10 전체 variant (for STSPTW pre-decision experiments):
-# easy/medium/hard × POMO, POMO_STAR, POMO_STAR_PIP (총 9 run)
-# 기존 설정 그대로 두되, STSPTW 실험과 짝을 맞추기 위해
-# 필요 시 --reveal_delay_before_action 를 함께 넘기는 버전.
-# (TSPTWEnv 에서는 delay 가 없으므로 이 플래그는 효과는 없지만, 인터페이스는 통일.)
+# TSPTW n=10 full sweep (paired with STSPTW pre-decision experiments):
+# easy/medium/hard × POMO, POMO_STAR, POMO_STAR_PIP (9 runs total).
+# Passes --reveal_delay_before_action for interface consistency with STSPTW runs.
+# (TSPTWEnv has no delay, so the flag has no effect, but keeps the interface uniform.)
 #
 # Submit: sbatch run_train_tsptw_n10_batch_reveal.sh
 #SBATCH --job-name=tsptw_n10_all_reveal

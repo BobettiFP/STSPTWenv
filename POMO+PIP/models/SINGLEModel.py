@@ -21,8 +21,8 @@ class SINGLEModel(nn.Module):
         # shape: (batch, problem+1, EMBEDDING_DIM)
 
     def pre_forward(self, reset_state):
-        # CVRP 계열만 depot_xy / node_demand를 사용하고,
-        # TSP 계열(TSPTW, STSPTW 등)은 depot_xy=None으로 둔다.
+        # CVRP variants use depot_xy / node_demand;
+        # TSP variants (TSPTW, STSPTW, etc.) leave depot_xy=None.
         if self.problem in ["CVRP", "OVRP", "VRPB", "VRPL", "VRPBL", "OVRPB", "OVRPL", "OVRPBL"]:
             depot_xy = reset_state.depot_xy  # (batch, 1, 2)
             node_demand = reset_state.node_demand

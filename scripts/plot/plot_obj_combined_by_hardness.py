@@ -9,14 +9,14 @@ def main():
     df_sts = pd.read_csv(sts_csv)
     df_ts = pd.read_csv(ts_csv)
 
-    # TSPTW 쪽은 delay_scale 이름을 delay_weight로 맞춰서 사용
+    # Rename delay_scale to delay_weight to align with STSPTW matched CSV
     df_ts = df_ts.rename(columns={"delay_scale": "delay_weight"})
 
     hardness_list = ["easy", "medium", "hard"]
     titles = {"easy": "easy", "medium": "medium", "hard": "hard"}
 
     for h in hardness_list:
-        # obj 값(aug_score)이 있는 것만 사용
+        # Only include rows where aug_score is available
         sub_sts = df_sts[(df_sts["hardness"] == h) & df_sts["aug_score"].notna()]
         sub_ts = df_ts[(df_ts["hardness"] == h) & df_ts["aug_score"].notna()]
 

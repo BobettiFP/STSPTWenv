@@ -35,7 +35,7 @@ for ax, h in zip(axes, hardness_list):
     if h == "easy":
         ax.set_ylabel("instance-level infeasible rate (%)")
 
-# 공통 legend
+# Shared legend
 handles, labels = axes[0].get_legend_handles_labels()
 fig.legend(handles, labels, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.02))
 

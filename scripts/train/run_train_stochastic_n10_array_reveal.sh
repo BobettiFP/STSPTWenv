@@ -1,7 +1,7 @@
 #!/bin/bash
-# STSPTW n=10 전체 variant (delay pre-decision): easy/medium/hard × POMO, POMO_STAR, POMO_STAR_PIP × 10 delay weights = 90 runs.
-# delay 가 move 이전(pre-decision)에 realize 되도록 --reveal_delay_before_action 옵션을 켠 버전.
-# 한 번에 최대 8개 task가 동시에 돌아가도록 SLURM array 제한을 둠.
+# STSPTW n=10 full sweep (pre-decision noise): easy/medium/hard × POMO, POMO_STAR, POMO_STAR_PIP × 10 delay weights = 90 runs.
+# Uses --reveal_delay_before_action so travel times are sampled before action selection.
+# SLURM array throttled to 8 concurrent tasks.
 # Submit: sbatch run_train_stochastic_n10_array_reveal.sh
 #SBATCH --job-name=stsp_n10_reveal
 #SBATCH --output=logs/slurm/stsp_n10_reveal_%A_%a.out

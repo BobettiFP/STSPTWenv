@@ -81,7 +81,7 @@ def main():
         ax_left.grid(True, alpha=0.3)
         ax_left.tick_params(labelleft=True)
 
-        # 합쳐진 legend 생성
+        # Combine legends from both axes
         handles_left, labels_left = ax_left.get_legend_handles_labels()
         handles_right, labels_right = ax_right.get_legend_handles_labels()
         handles = handles_left + handles_right

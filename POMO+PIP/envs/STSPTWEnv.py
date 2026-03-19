@@ -436,7 +436,7 @@ class STSPTWEnv:
             self.simulated_ninf_flag = torch.zeros((self.batch_size, self.pomo_size, self.problem_size))
             self.simulated_ninf_flag[out_of_tw] = float('-inf')
         elif pip_step == 1:
-            # 이 부분은 TSPTWEnv._calculate_PIP_mask의 pip_step==1 구현을 그대로 따른다.
+            # One-step lookahead: mirrors TSPTWEnv._calculate_PIP_mask pip_step==1.
             if self.is_sparse:  # calculate the k_sparse_mask
                 self.not_neigh_ninf_flag = self.k_neigh_ninf_flag[:, None, :, :].repeat(1, self.pomo_size, 1, 1)
 

@@ -1,6 +1,6 @@
 #!/bin/bash
-# TSPTW n=10 전체 variant: easy/medium/hard × POMO, POMO_STAR, POMO_STAR_PIP (총 9 run)
-# Job array 0-8: 각 task가 하나의 (hardness, model_type) 담당. 기존 체크포인트 있으면 skip.
+# TSPTW n=10 full sweep: easy/medium/hard × POMO, POMO_STAR, POMO_STAR_PIP (9 runs total).
+# Job array 0-8: each task handles one (hardness, model_type) pair. Skips if checkpoint exists.
 # Submit: sbatch run_train_tsptw_n10_batch.sh
 #SBATCH --job-name=tsptw_n10_all
 #SBATCH --output=logs/slurm/tsptw_n10_all_%A_%a.out
