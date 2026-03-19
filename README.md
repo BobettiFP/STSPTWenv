@@ -8,39 +8,110 @@ cd POMO+PIP
 
 ---
 
+## Environments
+
+### STSPTW (v1) (Realistic Version, Test later)
+
+Defined in `envs/STSPTWEnv.py`. Uses a **time-dependent, additive delay** model:
+
+```
+travel_time(i→j) = d_ij + delay_scale · base_delay(d_ij, current_time) · lognormal_factor(current_time)
+```
+
+- Delay is always positive — **not mean-preserving** (expected travel time > d_ij)
+- Noise magnitude depends on **current_time**: two Gaussian rush-hour peaks at 30% and 70% of the time horizon inflate both the delay and its variance
+- Longer edges get proportionally more delay (via a saturating distance factor)
+- Controlled by `--delay_scale` (0.1 / 0.3 / 0.5 in sweep); effective CV ≈ 0.03–0.12
+
+### STSPTW v2 (Theoretical Version, Test first)
+
+Defined in `envs/STSPTWEnv_v2.py`. Uses **edge-level, time-independent, mean-preserving noise**:
+
+```
+travel_time(i→j) ~ F(mean=d_ij, CV=cv)
+```
+
+Two supported distributions (set via `--noise_type`):
+
+| `--noise_type` | Distribution | CV control |
+|---|---|---|
+| `gamma` | Gamma(k, k/d) with k = 1/CV² | `--cv` directly sets CV |
+| `two_point` | d·0.7 or d·1.3 with equal probability | fixed CV ≈ 0.3; `--cv` has no effect |
+
+- **Mean-preserving**: E[t] = d_ij exactly; noise cancels on average
+- **State-independent**: same distribution regardless of when the edge is traversed
+- `out_of_tw` lookahead uses deterministic distances (consistent and monotonic)
+- Substantially higher variance than v1: CV ∈ {0.25, 0.5, 1.0} vs v1's effective CV of 0.03–0.12
+
+### Key differences
+
+| | V1 (STSPTW) | V2 (STSPTW_v2) |
+|---|---|---|
+| Noise model | Additive delay on d | Multiplicative perturbation of d |
+| Mean-preserving | No (always slower) | Yes |
+| Time-dependent | Yes (rush hours) | No |
+| Control parameter | `--delay_scale` | `--cv` |
+| Effective CV range | 0.03 – 0.12 | 0.25 – 1.0 |
+| `out_of_tw` lookahead | Re-samples noisy travel | Uses deterministic d |
+
+### Pre- vs post-decision noise
+
+Both environments support:
+- **Post-decision** (default): noise is realized *after* the agent picks a node — the agent never sees it
+- **Pre-decision** (`--reveal_delay_before_action`): travel times to all candidates are sampled and revealed to the agent *before* action selection
+
+---
+
+## Model types
+
+| `--model_type` | LM reward | PIP mask | Run name suffix |
+|---|---|---|---|
+| `POMO` | no | no | *(none)* |
+| `POMO_STAR` | yes | no | `_LM` |
+| `POMO_STAR_PIP` | yes | yes (during training) | `_LM_PIMask_1Step` |
+
+**LM** = Lagrangian Multiplier: adds timeout penalty terms (`timeout_reward`, `timeout_node_reward`) to the reward signal, driving the model toward feasibility.
+**PIP** = Proactive Infeasibility Prevention: a 1-step deterministic lookahead mask applied at each action step to eliminate nodes that would make the remaining tour infeasible.
+
+PIP can also be applied **post-hoc at inference** on a `POMO_STAR` checkpoint (no retraining needed) by passing `--generate_PI_mask --pip_step 1` to `test.py`.
+
+---
+
 ## Training
 
 Entry point: **`train.py`**
 
-**Problems:** `--problem` one of `TSPTW`, `STSPTW`.
-
-**Model types:** `--model_type` one of `POMO`, `POMO_STAR`, `POMO_STAR_PIP` (POMO only / + Lagrangian / + PIP masking).
-
-**Example – TSPTW n=10, hard, POMO_STAR:**
+**Example — STSPTW v1, n=10, hard, post-decision, POMO_STAR_PIP:**
 
 ```bash
-python train.py --problem TSPTW --problem_size 10 --pomo_size 10 --hardness hard --model_type POMO_STAR \
+python train.py --problem STSPTW --problem_size 10 --pomo_size 10 --hardness hard \
+  --model_type POMO_STAR_PIP --delay_scale 0.3 \
   --epochs 10000 --train_episodes 10000 --train_batch_size 1024 \
-  --val_episodes 10000 --validation_batch_size 1000 --validation_interval 500 --model_save_interval 1000
+  --val_episodes 10000 --validation_batch_size 1000 --validation_interval 500 --model_save_interval 50
 ```
 
-**Example – STSPTW n=10, pre-decision noise, POMO_STAR_PIP:**
+**Example — STSPTW v2, n=10, hard, gamma noise, CV=0.5, POMO_STAR_PIP:**
 
 ```bash
-python train.py --problem STSPTW --problem_size 10 --pomo_size 10 --hardness hard --model_type POMO_STAR_PIP \
-  --reveal_delay_before_action --delay_scale 0.1 \
+python train.py --problem STSPTW_v2 --problem_size 10 --pomo_size 10 --hardness hard \
+  --model_type POMO_STAR_PIP --noise_type gamma --cv 0.5 \
+  --reveal_delay_before_action \
   --epochs 10000 --train_episodes 10000 --train_batch_size 1024 \
-  --val_episodes 10000 --validation_batch_size 1000 --validation_interval 500 --model_save_interval 1000
+  --val_episodes 10000 --validation_batch_size 1000 --validation_interval 500 --model_save_interval 50
 ```
 
-**STSPTW-only flags:**
+**Key training flags:**
 
 | Flag | Meaning |
-|------|--------|
-| `--delay_scale` | Delay magnitude (default `0.1`) |
-| `--reveal_delay_before_action` | Pre-decision noise: sample travel times before action; omit for post-decision |
+|---|---|
+| `--problem` | `TSPTW`, `STSPTW` (v1), or `STSPTW_v2` |
+| `--model_type` | `POMO`, `POMO_STAR`, `POMO_STAR_PIP` |
+| `--delay_scale` | V1 noise magnitude (default `0.1`) |
+| `--noise_type` | V2 distribution: `gamma` or `two_point` |
+| `--cv` | V2 coefficient of variation (default `0.5`) |
+| `--reveal_delay_before_action` | Pre-decision noise (omit for post-decision) |
 
-Checkpoints and logs go under `results/<run_name>/` (run name includes problem, size, hardness, `_dw...` for STSPTW, `_LM` for timeout reward, `_PIMask_*Step` for PIP).
+Checkpoints are saved under `results/<run_name>/epoch-N.pt`. The run name encodes all key settings (problem, size, hardness, noise params, `_LM`, `_PIMask_1Step`).
 
 ---
 
@@ -48,68 +119,44 @@ Checkpoints and logs go under `results/<run_name>/` (run name includes problem, 
 
 Entry point: **`test.py`**
 
-**Example – evaluate a checkpoint on STSPTW n=10 hard:**
-
-```bash
-python test.py --problem STSPTW --problem_size 10 --hardness hard --pomo_size 1 \
-  --checkpoint results/<run_name>/epoch-10000.pt \
-  --test_set_path ../data/TSPTW/tsptw10_hard.pkl \
-  --test_set_opt_sol_path ../data/TSPTW/lkh_tsptw10_hard.pkl \
-  --aug_factor 8 --generate_PI_mask --pip_step 1
-```
-
-If `--test_set_path` and `--test_set_opt_sol_path` are omitted, defaults under `../data/<problem>/` are used (for STSPTW the data problem is TSPTW, e.g. `tsptw10_hard.pkl`).
-
-**STSPTW evaluation with pre-decision noise (match training):**
+**Example — evaluate POMO_STAR_PIP checkpoint on STSPTW v1:**
 
 ```bash
 python test.py --problem STSPTW --problem_size 10 --hardness hard \
   --checkpoint results/<run_name>/epoch-10000.pt \
-  --reveal_delay_before_action --delay_scale 0.1 \
-  --aug_factor 8 --generate_PI_mask --pip_step 1
+  --delay_scale 0.3 --aug_factor 8 --no_opt_sol
 ```
+
+**Example — evaluate POMO_STAR checkpoint with PIP applied post-hoc (v2, gamma):**
+
+```bash
+python test.py --problem STSPTW_v2 --problem_size 10 --hardness hard \
+  --checkpoint results/<run_name>/epoch-10000.pt \
+  --noise_type gamma --cv 0.5 --reveal_delay_before_action \
+  --aug_factor 8 --no_opt_sol \
+  --generate_PI_mask --pip_step 1
+```
+
+If `--test_set_path` is omitted, the default dataset under `../data/TSPTW/tsptw<N>_<hardness>.pkl` is used (both v1 and v2 use the same deterministic TSPTW instance files).
 
 ---
 
-## Experiments: TSPTW models on STSPTW (delay sweep)
+## Sweep experiments
 
-**Script:** `run_test_tsptw_on_stsptw_sweep_dw.py` (run from `STSPTWenv/`)
+All sweep scripts live in `scripts/` and are run from the **project root** (`STSPTWenv/`).
 
-Tests the **9 TSPTW-trained models** on **STSPTW** with `delay_scale` from **0.01 to 1.0** (step 0.01). Total **900** runs. Results are written to `test_tsptw_on_stsptw_dw_sweep.csv`.
+| Script | What it runs | Output CSV |
+|---|---|---|
+| `scripts/train/sweep_v1.sh` | 54 v1 training runs (SLURM array) | — |
+| `scripts/train/sweep_v2.sh` | 54 v2 training runs (SLURM array) | — |
+| `scripts/test/run_test_sweep_v1_v2.py` | Evaluate all 108 trained models | `results/csv/test_sweep_v1_v2.csv` |
+| `scripts/test/run_test_pomo_star_posthoc_pip.py` | POMO* checkpoints + PIP post-hoc | `results/csv/test_pomo_star_posthoc_pip.csv` |
 
-```bash
-cd STSPTWenv
-# Full run (9 × 100 = 900 experiments)
-python run_test_tsptw_on_stsptw_sweep_dw.py
-
-# Dry run: list checkpoints and example command
-python run_test_tsptw_on_stsptw_sweep_dw.py --dry_run
-
-# Test with fewer runs
-python run_test_tsptw_on_stsptw_sweep_dw.py --limit_models 2 --limit_dw 5
-```
-
-Uses `--no_opt_sol` so optimal solution files are not required (gap column will be 0).
-
-**Experiment 2: STSPTW models on matching STSPTW env (90 runs)**
-
-**Script:** `run_test_stsptw_matched.py`
-
-Each of the **90 STSPTW-trained models** is tested on the **same** STSPTW setting it was trained on (same hardness, same delay_weight). Total **90** runs. Results: `test_stsptw_matched.csv`.
+Submit test jobs via the corresponding `.sh` wrappers:
 
 ```bash
-cd STSPTWenv
-python run_test_stsptw_matched.py --dry_run   # list checkpoints
-python run_test_stsptw_matched.py --limit 5  # test first 5 configs
-python run_test_stsptw_matched.py             # full 90 runs
+sbatch scripts/test/run_test_sweep_v1_v2.sh
+sbatch scripts/test/run_test_pomo_star_posthoc_pip.sh
 ```
 
----
-
-## Summary
-
-- **Working directory:** `POMO+PIP/`
-- **Train:** `python train.py --problem <TSPTW|STSPTW> --problem_size N --pomo_size N --hardness <easy|medium|hard> --model_type <POMO|POMO_STAR|POMO_STAR_PIP> [--reveal_delay_before_action] [other args]`
-- **Test:** `python test.py --problem ... --checkpoint <path> [--reveal_delay_before_action] [other args]`
-
-Shell scripts (e.g. `run_train_n10.sh`) are not tracked; use the commands above as the reference.
+Plots are generated by scripts in `scripts/plot/` and saved to `results/figures/`.
