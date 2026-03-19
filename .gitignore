@@ -1,15 +1,11 @@
 .pt
 
-# Shell scripts (run instructions in README)
-*.sh
-
 venv/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 *.log
-*.out
 
 # IDE / editor
 .vscode/
@@ -31,6 +27,13 @@ POMO+PIP/*.log
 
 # Large external data
 data/
+
+# Logs (slurm output, etc.)
+logs/slurm/*.out
+
+# Results (regenerable)
+results/figures/*.png
+results/csv/*.csv
 
 # Checkpoints
 **/trained_model_*.pt
