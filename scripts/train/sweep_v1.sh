@@ -56,7 +56,7 @@ echo "============================================"
 
 python train.py \
     --problem STSPTW \
-    --problem_size 50 --pomo_size 50 \
+    --problem_size 10 --pomo_size 10 \
     --hardness "$HARDNESS" \
     --delay_scale "$DW" \
     $PRE_FLAG \

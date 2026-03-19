@@ -17,6 +17,13 @@ def args2dict(args):
         "delay_scale": getattr(args, "delay_scale", 0.1),
         "time_scale": getattr(args, "time_scale", 10.0),
         "reveal_delay_before_action": getattr(args, "reveal_delay_before_action", False),
+        # STSPTW_v2 params (ignored by other envs)
+        "noise_type": getattr(args, "noise_type", "gamma"),
+        "cv": getattr(args, "cv", 0.5),
+        "alpha": getattr(args, "alpha", 0.95),
+        "n_mc_samples": getattr(args, "n_mc_samples", 32),
+        "two_point_delta": getattr(args, "two_point_delta", 0.3),
+        "two_point_p": getattr(args, "two_point_p", 0.5),
     }
 
     model_params = {
@@ -59,6 +66,14 @@ if __name__ == "__main__":
         action='store_true',
         help='For STSPTW: if set, sample and reveal stochastic travel times before action selection (pre-decision noise).'
     )
+    # STSPTW_v2 params
+    parser.add_argument('--noise_type', type=str, default='gamma', choices=['gamma', 'two_point'],
+                        help='STSPTW_v2: stochastic distribution family')
+    parser.add_argument('--cv', type=float, default=0.5, help='STSPTW_v2: coefficient of variation')
+    parser.add_argument('--alpha', type=float, default=0.95, help='STSPTW_v2: chance constraint level for MC PIP mask')
+    parser.add_argument('--n_mc_samples', type=int, default=32, help='STSPTW_v2: MC samples for PIP probability estimation')
+    parser.add_argument('--two_point_delta', type=float, default=0.3, help='STSPTW_v2: delta for two-point distribution')
+    parser.add_argument('--two_point_p', type=float, default=0.5, help='STSPTW_v2: p(low) for two-point distribution')
     # model_params
     parser.add_argument('--embedding_dim', type=int, default=128)
     parser.add_argument('--sqrt_embedding_dim', type=float, default=128 ** (1 / 2))
